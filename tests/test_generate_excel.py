@@ -49,3 +49,11 @@ def test_spanish_headers(tmp_path, monkeypatch):
     sheets = generate_to(monkeypatch, tmp_path / "a.xlsx")
     for key, df in sheets.items():
         assert list(df.columns) == list(gen.COLUMN_NAMES[key].values())
+
+def test_some_drugs_are_out_of_stock():
+    rng = random.Random(gen.SEED)
+    drugs = gen.make_drugs(rng)
+    sales = gen.make_sales(rng, drugs)
+    drugs = gen.add_initial_stock(rng, drugs, sales)
+    sold = sales.groupby("drug_id")["quantity"].sum().reindex(drugs["drug_id"]).fillna(0)
+    assert int((drugs["initial_stock"].values == sold.values).sum()) == gen.N_OUT_OF_STOCK

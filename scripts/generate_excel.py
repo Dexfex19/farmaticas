@@ -16,6 +16,7 @@ START_DATE = datetime(2025, 1, 1)
 END_DATE = datetime(2026, 10, 31)
 STOCK_MIN = 20  # margen mínimo de stock por encima de lo vendido
 STOCK_MAX = 200  # margen máximo de stock por encima de lo vendido
+N_OUT_OF_STOCK = 2  # medicamentos que quedan agotados (stock inicial = unidades vendidas)
 MAX_QUANTITY = 3
 NULL_RATE = 0.05
 DUPLICATE_RATE = 0.05
@@ -101,11 +102,13 @@ def make_sales(rng, drugs):
 
 
 def add_initial_stock(rng, drugs, sales):
-    """Stock inicial = unidades vendidas + margen aleatorio. Nunca queda por debajo de lo vendido."""
+    """Stock inicial = unidades vendidas + margen aleatorio. Nunca queda por debajo de lo vendido.
+    Algunos medicamentos quedan agotados (margen 0) para que la demo muestre ambos estados."""
     sold = sales.groupby("drug_id")["quantity"].sum()
+    out_of_stock = set(rng.sample(list(drugs["drug_id"]), N_OUT_OF_STOCK))
     drugs = drugs.copy()
     drugs["initial_stock"] = [
-        int(sold.get(drug_id, 0)) + rng.randint(STOCK_MIN, STOCK_MAX)
+        int(sold.get(drug_id, 0)) + (0 if drug_id in out_of_stock else rng.randint(STOCK_MIN, STOCK_MAX))
         for drug_id in drugs["drug_id"]
     ]
     return drugs
