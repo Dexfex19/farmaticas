@@ -1,0 +1,16 @@
+LOG DE LIMPIEZA - FARMATICAS
+
+Datos de entrada:
+- Medicamentos: 30 filas, nulos: ninguno
+- Clientes: 200 filas, nulos: {'Nombre completo': 10, 'Ciudad': 10}
+- Ventas: 1575 filas, nulos: {'Cantidad': 79}
+
+Acciones:
+Clientes: 10 valores nulos en 'Nombre completo' reemplazados por 'Sin dato'
+Clientes: 10 valores nulos en 'Ciudad' reemplazados por 'Sin dato'
+Ventas: 75 filas duplicadas eliminadas (de 1575 a 1500)
+Ventas: 75 de 75 cantidades nulas recuperadas (total / precio unitario)
+
+Efecto sobre el inventario:
+- Unidades vendidas: antes 2998, después 3019
+- Medicamentos con inventario negativo: antes 0, después 0
