@@ -1,5 +1,143 @@
 <!DOCTYPE html>
 <html lang="es">
-<head><meta charset="utf-8"><title>Farmaticas</title></head>
-<body><h1>Farmaticas</h1><p>Front-end en construcción.</p></body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farmaticas | Inventario</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f5f7f9; color: #1f2933; }
+    header { background: #0b6e4f; color: #fff; padding: 20px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; }
+    header h1 { margin: 0; font-size: 1.6rem; }
+    header p { margin: 0; opacity: 0.9; flex: 1; }
+    main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    input[type="search"] { flex: 1; max-width: 420px; padding: 10px 12px; font-size: 1rem; border: 1px solid #c4ccd4; border-radius: 6px; }
+    #count { color: #52606d; }
+    #message { color: #b42318; min-height: 1.2em; margin: 8px 0; }
+    .table-wrap { overflow-x: auto; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #e4e7eb; white-space: nowrap; }
+    th { background: #eef2f5; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    tr:last-child td { border-bottom: none; }
+    .num { text-align: right; }
+    .strong { font-weight: 700; }
+    .badge, .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; }
+    .pill { background: #e4e7eb; color: #3e4c59; }
+    .ok { background: #e6f4ea; color: #137333; }
+    .out { background: #fce8e6; color: #c5221f; }
+    .note { color: #52606d; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Farmaticas</h1>
+    <p>Inventario disponible de medicamentos</p>
+    <span id="connection" class="pill">Base de datos: verificando...</span>
+  </header>
+  <main>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Buscar medicamento por nombre..." autocomplete="off">
+      <span id="count"></span>
+    </div>
+    <p id="message" role="status"></p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Medicamento</th>
+            <th class="num">Precio unitario</th>
+            <th class="num">Existencias iniciales</th>
+            <th class="num">Unidades vendidas</th>
+            <th class="num">Inventario</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="note">Inventario disponible = existencias iniciales − unidades vendidas. Datos de ejemplo.</p>
+  </main>
+
+  <script>
+    const searchInput = document.getElementById("search");
+    const rowsBody = document.getElementById("rows");
+    const countLabel = document.getElementById("count");
+    const message = document.getElementById("message");
+    const connection = document.getElementById("connection");
+    const numberFormat = new Intl.NumberFormat("es-CR");
+
+    let latestRequest = 0;
+    let debounceTimer;
+
+    function cell(text, className) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (className) td.className = className;
+      return td;
+    }
+
+    function renderRows(items) {
+      rowsBody.replaceChildren();
+      for (const item of items) {
+        const tr = document.createElement("tr");
+        tr.append(
+          cell(item.nombre),
+          cell("₡" + numberFormat.format(item.precio_unitario), "num"),
+          cell(numberFormat.format(item.existencias_iniciales), "num"),
+          cell(numberFormat.format(item.unidades_vendidas), "num"),
+          cell(numberFormat.format(item.inventario_disponible), "num strong")
+        );
+        const statusCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.textContent = item.estado;
+        badge.className = "badge " + (item.estado === "Agotado" ? "out" : "ok");
+        statusCell.append(badge);
+        tr.append(statusCell);
+        rowsBody.append(tr);
+      }
+    }
+
+    async function loadInventory() {
+      const requestId = ++latestRequest;
+      const query = searchInput.value.trim();
+      const url = query ? "/inventario?buscar=" + encodeURIComponent(query) : "/inventario";
+      message.textContent = "";
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const items = await response.json();
+        if (requestId !== latestRequest) return; // llegó una respuesta más nueva
+        renderRows(items);
+        countLabel.textContent = items.length + (items.length === 1 ? " medicamento" : " medicamentos");
+        if (items.length === 0) message.textContent = "No se encontraron medicamentos con ese nombre.";
+      } catch (error) {
+        if (requestId !== latestRequest) return;
+        rowsBody.replaceChildren();
+        countLabel.textContent = "";
+        message.textContent = "No se pudo cargar el inventario. Verifique que la API esté en ejecución.";
+      }
+    }
+
+    async function checkConnection() {
+      try {
+        const response = await fetch("/salud");
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        connection.textContent = "Base de datos: conectada";
+        connection.className = "pill ok";
+      } catch (error) {
+        connection.textContent = "Base de datos: sin conexión";
+        connection.className = "pill out";
+      }
+    }
+
+    // Espera 300 ms después de la última tecla para no consultar en cada letra
+    searchInput.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadInventory, 300);
+    });
+
+    checkConnection();
+    loadInventory();
+  </script>
+</body>
 </html>
